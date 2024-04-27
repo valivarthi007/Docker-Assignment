@@ -1,0 +1,67 @@
+# Stage 1: Clone Flutter Project and Build for Android
+FROM ubuntu:latest AS android-builder
+
+# Install necessary dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    openjdk-8-jdk \
+    unzip \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user
+RUN useradd -m flutteruser
+USER flutteruser
+
+# Install Flutter SDK
+ENV FLUTTER_HOME=/home/flutteruser/flutter
+RUN git clone https://github.com/flutter/flutter.git $FLUTTER_HOME
+ENV PATH=$FLUTTER_HOME/bin:$PATH
+RUN flutter precache
+
+# Clone the Flutter project
+WORKDIR /app
+RUN git clone https://github.com/karemSD/Minmal-Shop-app.git .
+
+# Build APK for Android
+RUN flutter build apk --release
+
+# Stage 2: Build for Web
+FROM ubuntu:latest AS web-builder
+
+# Install necessary dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user
+RUN useradd -m flutteruser
+USER flutteruser
+
+# Install Flutter SDK
+ENV FLUTTER_HOME=/home/flutteruser/flutter
+RUN git clone https://github.com/flutter/flutter.git $FLUTTER_HOME
+ENV PATH=$FLUTTER_HOME/bin:$PATH
+RUN flutter precache
+
+# Clone the Flutter project
+WORKDIR /app
+RUN git clone https://github.com/karemSD/Minmal-Shop-app.git .
+
+# Build web application
+RUN flutter build web
+
+# Stage 3: Serve Web Application
+FROM nginx:alpine
+
+# Copy built web application from previous stage
+COPY --from=web-builder /app/build/web /usr/share/nginx/html
+
+# Expose port
+EXPOSE 80
+
+# Command to start nginx
+CMD ["nginx", "-g", "daemon off;"]
+
